@@ -1,0 +1,23 @@
+# Gradle and Java build output
+.gradle/
+**/build/
+*.class
+
+# IDE and operating system files
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+.DS_Store
+
+# Local credentials and overrides
+.env
+.env.*
+!.env.example
+**/application-local.properties
+**/application-local.yml
+**/application-local.yaml
+*.p8
+*.pem
+*.key
