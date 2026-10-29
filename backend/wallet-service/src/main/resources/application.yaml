@@ -1,0 +1,38 @@
+spring:
+  application:
+    name: wallet-service
+  datasource:
+    url: ${WALLET_DB_URL:jdbc:postgresql://localhost:5432/vaultpay_wallet}
+    username: ${WALLET_DB_USERNAME:vaultpay_wallet}
+    password: ${WALLET_DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 3000
+  # Schema changes remain an explicit operational step: off by default, switched on
+  # per environment (WALLET_FLYWAY_ENABLED=true) for local runs and migration jobs.
+  flyway:
+    enabled: ${WALLET_FLYWAY_ENABLED:false}
+    # Fail instead of silently adopting a database that already has tables but no history.
+    baseline-on-migrate: false
+    validate-on-migrate: true
+  sql:
+    init:
+      mode: never
+
+vaultpay:
+  wallet:
+    default-currency: INR
+  security:
+    jwt:
+      issuer: ${JWT_ISSUER:http://localhost:8080}
+      # Tokens meant for another API must not be accepted here.
+      audience: ${JWT_AUDIENCE:vaultpay-wallet}
+      # Public keys only: Wallet verifies tokens, it never signs them.
+      jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8080/.well-known/jwks.json}
+
+server:
+  port: ${SERVER_PORT:8081}
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
