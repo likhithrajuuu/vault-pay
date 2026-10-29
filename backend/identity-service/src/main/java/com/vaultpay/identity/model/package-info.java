@@ -1,12 +1,12 @@
 /**
- * Identity data models only, with no ORM, repositories, or authentication services.
+ * Identity data models only. Persistence and authentication live in separate packages.
  * Models containing profile/credential data must not be exposed directly as API DTOs.
  * Redacted toString methods do not prevent reflection-based serialization.
  *
  * Future persistence must map UUID, Instant/TIMESTAMPTZ, enum names, embedded
  * address columns, encrypted PAN bytes/key reference, and atomic version updates.
  *
- * RS256 is the intended future access-token signature algorithm, separate from
+ * RS256 is the access-token signature algorithm, separate from
  * Argon2id password storage and PAN encryption. Private RSA keys must be managed
  * outside user records and identified by kid; signing/validation must pin RS256,
  * validate issuer/audience/expiry, and support key rotation. RSA keys must be at

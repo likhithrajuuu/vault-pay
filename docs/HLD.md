@@ -108,22 +108,54 @@ This model does not prove database throughput or justify a machine size. A heavi
 ### Components and ownership
 
 ```mermaid
-flowchart LR
-    C[API client] --> A[Stateless API instances]
-    A --> I[Identity and access module]
-    A --> W[Wallet and transfer module]
-    I --> D[(Transactional primary)]
-    W --> D
-    D --> R[(Replicated database copies)]
-    D --> O[Outbox relay]
-    O --> E[Durable event delivery]
-    E --> N[Notification worker]
-    E --> P[Reporting worker]
-    P --> V[(Reporting projections)]
-    A --> V
+flowchart TB
+    Client[API client] -->|HTTPS / REST| GW[API gateway<br/>Apache APISIX]
+
+    subgraph Sync["Synchronous path: caller needs the answer"]
+        direction TB
+        ID[Identity Service]
+        WAL[Wallet Service<br/>metadata and lifecycle]
+        TL[Transfer and Ledger Service<br/>balances, postings, idempotency]
+    end
+
+    GW -->|REST| ID
+    GW -->|REST| WAL
+    GW -->|REST| TL
+    WAL -->|gRPC: eligibility| ID
+    TL -->|gRPC: wallet precheck| WAL
+
+    ID --> IDB[(Identity DB)]
+    WAL --> WDB[(Wallet DB)]
+    TL --> FDB[(Financial DB<br/>primary)]
+    FDB -.->|replication| FRep[(Financial DB<br/>replica)]
+    FRep -.->|stale-tolerant reads| TL
+
+    ID --- IOB[[Outbox]]
+    WAL --- WOB[[Outbox]]
+    TL --- FOB[[Outbox]]
+
+    subgraph Async["Asynchronous path: committed facts"]
+        direction TB
+        K[[Apache Kafka]]
+        NS[Notification Service]
+        RP[Reporting consumer<br/>deferred]
+    end
+
+    IOB -->|relay| K
+    WOB -->|relay| K
+    FOB -->|relay| K
+    K -->|lifecycle events| TL
+    K --> NS
+    K -.-> RP
+    NS --> NDB[(Notification DB)]
+    RP -.-> VP[(Reporting projections)]
 ```
 
-These boxes describe responsibilities, not a commitment to one microservice per box. The initial API may be one modular deployable; background workers are separate processes. Financial tables have one owning module, and unrelated modules do not update balances directly.
+**Reading the diagram.** Solid arrows into services are request/response calls: REST from the client through the gateway, and gRPC between services only where the caller cannot proceed without the answer. The monetary decision (funds check, debit, credit, idempotency record, outbox row) happens inside one Financial DB transaction in Transfer and Ledger. Everything after the commit travels as an event: each service writes to its own outbox in the same transaction as its state change, a relay publishes to Kafka at-least-once, and consumers deduplicate. Notification and reporting failures never affect a committed transfer.
+
+**Rule of thumb.** Use gRPC when the caller needs the result to finish its own work; use Kafka when something has happened and other services may react in their own time. Never use an event as a request/response substitute, and never put notification or reporting calls on the financial commit path.
+
+Each service privately owns its database, and only Transfer and Ledger updates balances or postings. The diagram follows the microservices proposal in [MICROSERVICES.md](MICROSERVICES.md); whether Identity and Wallet become separate deployables or start as one modular API remains open decision D1, and the same ownership boundaries apply either way. Background relays and consumers run as separate processes. The Financial DB replica serves only history and reporting queries that tolerate staleness; authoritative balance and transfer-status reads stay on the primary.
 
 The primary stores identities, wallets, transfer records, monetary postings, idempotency records, and an outbox of committed events. Reporting projections and caches are rebuildable derivatives. They cannot authorize spending or resolve an uncertain monetary commit.
 

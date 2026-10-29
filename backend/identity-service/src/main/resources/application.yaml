@@ -1,3 +1,34 @@
 spring:
   application:
     name: identity-service
+  datasource:
+    url: ${IDENTITY_DB_URL:jdbc:postgresql://localhost:5432/vaultpay_identity}
+    username: ${IDENTITY_DB_USERNAME:vaultpay_identity}
+    password: ${IDENTITY_DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 3000
+  # Schema changes remain an explicit operational step; never migrate on startup.
+  flyway:
+    enabled: false
+  sql:
+    init:
+      mode: never
+
+vaultpay:
+  security:
+    jwt:
+      issuer: ${JWT_ISSUER:http://localhost:8080}
+      audience: ${JWT_AUDIENCE:vaultpay-identity}
+      access-token-ttl: 15m
+      key-id: ${JWT_KEY_ID:identity-key-1}
+      # External PEM resources: PKCS#8 private key and X.509 public key.
+      # Startup fails closed if either is missing or the pair does not match.
+      private-key-location: ${JWT_PRIVATE_KEY_LOCATION:}
+      public-key-location: ${JWT_PUBLIC_KEY_LOCATION:}
+
+server:
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
